@@ -356,7 +356,7 @@ export function ConsolePage() {
   const handleLanguageChange = (language: string) => {
     setLanguage(language);
   };
-  
+
   const startCountdown = () => {
     setTimeLeft(15 * 60); // Set initial time to 15 minutes (900 seconds)
     setIsTicking(true);
@@ -525,6 +525,13 @@ export function ConsolePage() {
 
         </div>
 
+      </div><div className="pinned-bottom">
+        <div className="content-block kv">
+          <div className="content-block-title">set_memory()</div>
+          <div className="content-block-body content-kv">
+            {JSON.stringify(memoryKv, null, 2)}
+          </div>
+        </div>
       </div>
     </div>
   );
