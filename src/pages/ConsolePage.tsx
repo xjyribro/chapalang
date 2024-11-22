@@ -5,7 +5,7 @@ import { useEffect, useRef, useCallback, useState } from 'react';
 import { RealtimeClient } from '@openai/realtime-api-beta';
 import { ItemType } from '@openai/realtime-api-beta/dist/lib/client.js';
 import { WavRecorder, WavStreamPlayer } from '../lib/wavtools/index.js';
-import { getInstructions } from '../utils/conversation_config.js';
+import { getFirstPrompt, getInstructions } from '../utils/conversation_config.js';
 import { WavRenderer } from '../utils/wav_renderer';
 import { RealtimeEvent } from '../constants.js';
 
@@ -128,8 +128,7 @@ export function ConsolePage() {
     client.sendUserMessageContent([
       {
         type: `input_text`,
-        text: `Before you hear the first audio, please start with translating the following paragraph into Singaporean ${language}: "This tool serves as an live interpreter between ${language} and English. You can share your concerns in ${language}, and I will translate it into English for you. Please pause every 4-5 sentences so that I can translate it into English for the volunteer who is here with you. Thank you!"`,
-        // text: `For testing purposes, I want you to list ten car brands. Number each item, e.g. "one (or whatever number you are one): the item name".`
+        text: getFirstPrompt(language),
       },
     ]);
 
@@ -161,10 +160,7 @@ export function ConsolePage() {
     const client = clientRef.current;
     client.deleteItem(id);
   }, []);
-  
-  /**
-   * Auto-scroll the event logs
-   */
+
   useEffect(() => {
     if (eventsScrollRef.current) {
       const eventsEl = eventsScrollRef.current;
@@ -432,7 +428,7 @@ export function ConsolePage() {
           label={isConnected ? 'Stop' : 'Start'}
           iconPosition={isConnected ? 'end' : 'start'}
           icon={isConnected ? X : Zap}
-          buttonStyle={isConnected ? 'regular' : 'action'}
+          buttonStyle={isConnected ? 'alert' : 'action'}
           onClick={
             isConnected ? disconnectConversation : connectConversation
           }
@@ -506,7 +502,7 @@ export function ConsolePage() {
               })}
             </div>
           </div>
-          
+
         </div>
 
       </div>
