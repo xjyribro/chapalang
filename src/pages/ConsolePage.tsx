@@ -5,15 +5,14 @@ import { useEffect, useRef, useCallback, useState } from 'react';
 import { RealtimeClient } from '@openai/realtime-api-beta';
 import { ItemType } from '@openai/realtime-api-beta/dist/lib/client.js';
 import { WavRecorder, WavStreamPlayer } from '../lib/wavtools/index.js';
-import { getInstructions } from '../utils/conversation_config.js';
+import { getFirstPrompt, getInstructions } from '../utils/conversation_config.js';
 import { WavRenderer } from '../utils/wav_renderer';
+import { RealtimeEvent } from '../constants.js';
 
 import { X, Edit, Zap } from 'react-feather';
 import { Button } from '../components/button/Button';
-import { Toggle } from '../components/toggle/Toggle';
 
 import './ConsolePage.scss';
-import { RealtimeEvent } from '../constants.js';
 
 export function ConsolePage() {
   /**
@@ -29,12 +28,6 @@ export function ConsolePage() {
     localStorage.setItem('tmp::voice_api_key', apiKey);
   }
 
-  /**
-   * Instantiate:
-   * - WavRecorder (speech input)
-   * - WavStreamPlayer (speech output)
-   * - RealtimeClient (API client)
-   */
   const wavRecorderRef = useRef<WavRecorder>(
     new WavRecorder({ sampleRate: 24000 })
   );
@@ -52,35 +45,22 @@ export function ConsolePage() {
     )
   );
 
-  /**
-   * References for
-   * - Rendering audio visualization (canvas)
-   * - Autoscrolling event logs
-   * - Timing delta for event log displays
-   */
   const clientCanvasRef = useRef<HTMLCanvasElement>(null);
   const serverCanvasRef = useRef<HTMLCanvasElement>(null);
   const eventsScrollHeightRef = useRef(0);
   const eventsScrollRef = useRef<HTMLDivElement>(null);
   const startTimeRef = useRef<string>(new Date().toISOString());
 
-  /**
-   * All of our variables for displaying application state
-   * - items are all conversation items (dialog)
-   * - realtimeEvents are event logs, which can be expanded
-   * - memoryKv is for set_memory() function
-   * - coords, marker are for get_weather() function
-   */
   const [items, setItems] = useState<ItemType[]>([]);
   const [realtimeEvents, setRealtimeEvents] = useState<RealtimeEvent[]>([]);
   const [isConnected, setIsConnected] = useState(false);
-  const [canPushToTalk, setCanPushToTalk] = useState(true);
-  const [isRecording, setIsRecording] = useState(false);
   const [memoryKv, setMemoryKv] = useState<{ [key: string]: any }>({});
 
   const [language, setLanguage] = useState('');
   const [timeLeft, setTimeLeft] = useState(0);
   const [isTicking, setIsTicking] = useState(false);
+  const timerIntervalRef = useRef<number | null>(null);
+
   let timer: NodeJS.Timeout;
 
   /**
@@ -121,6 +101,11 @@ export function ConsolePage() {
    * WavRecorder taks speech input, WavStreamPlayer output, client is API client
    */
   const connectConversation = useCallback(async () => {
+
+    if (language === '') {
+      alert('Please select a language')
+      return
+    }
     const client = clientRef.current;
     const wavRecorder = wavRecorderRef.current;
     const wavStreamPlayer = wavStreamPlayerRef.current;
@@ -150,14 +135,15 @@ export function ConsolePage() {
     client.sendUserMessageContent([
       {
         type: `input_text`,
-        text: `Before you hear the first audio, please start with translating the following paragraph into Singaporean ${language}: "This tool serves as an live interpreter between ${language} and English. You can share your concerns in ${language}, and I will translate it into English for you. Please pause every 4-5 sentences so that I can translate it into English for the volunteer who is here with you. Thank you!"`,
-        // text: `For testing purposes, I want you to list ten car brands. Number each item, e.g. "one (or whatever number you are one): the item name".`
+        text: getFirstPrompt(language),
       },
     ]);
 
     if (client.getTurnDetectionType() === 'server_vad') {
       await wavRecorder.record((data) => client.appendInputAudio(data.mono));
     }
+
+    startCountdown()
   }, [language]);
 
   /**
@@ -175,6 +161,7 @@ export function ConsolePage() {
     const wavRecorder = wavRecorderRef.current;
     await wavRecorder.end();
 
+    stopCountdown()
     const wavStreamPlayer = wavStreamPlayerRef.current;
     await wavStreamPlayer.interrupt();
   }, []);
@@ -183,10 +170,7 @@ export function ConsolePage() {
     const client = clientRef.current;
     client.deleteItem(id);
   }, []);
-  
-  /**
-   * Auto-scroll the event logs
-   */
+
   useEffect(() => {
     if (eventsScrollRef.current) {
       const eventsEl = eventsScrollRef.current;
@@ -295,35 +279,35 @@ export function ConsolePage() {
     client.updateSession({ input_audio_transcription: { model: 'whisper-1' } });
 
     // Add tools
-    client.addTool(
-      {
-        name: 'set_memory',
-        description: 'Saves important data about the user into memory.',
-        parameters: {
-          type: 'object',
-          properties: {
-            key: {
-              type: 'string',
-              description:
-                'The key of the memory value. Always use lowercase and underscores, no other characters.',
-            },
-            value: {
-              type: 'string',
-              description: 'Value can be anything represented as a string',
-            },
-          },
-          required: ['key', 'value'],
-        },
-      },
-      async ({ key, value }: { [key: string]: any }) => {
-        setMemoryKv((memoryKv) => {
-          const newKv = { ...memoryKv };
-          newKv[key] = value;
-          return newKv;
-        });
-        return { ok: true };
-      }
-    );
+    // client.addTool(
+    //   {
+    //     name: 'set_memory',
+    //     description: 'Saves important data about the user into memory.',
+    //     parameters: {
+    //       type: 'object',
+    //       properties: {
+    //         key: {
+    //           type: 'string',
+    //           description:
+    //             'The key of the memory value. Always use lowercase and underscores, no other characters.',
+    //         },
+    //         value: {
+    //           type: 'string',
+    //           description: 'Value can be anything represented as a string',
+    //         },
+    //       },
+    //       required: ['key', 'value'],
+    //     },
+    //   },
+    //   async ({ key, value }: { [key: string]: any }) => {
+    //     setMemoryKv((memoryKv) => {
+    //       const newKv = { ...memoryKv };
+    //       newKv[key] = value;
+    //       return newKv;
+    //     });
+    //     return { ok: true };
+    //   }
+    // );
 
     // handle realtime events from client + server for event logging
     client.on('realtime.event', (realtimeEvent: RealtimeEvent) => {
@@ -365,41 +349,44 @@ export function ConsolePage() {
     setItems(client.conversation.getItems());
 
     return () => {
-      // cleanup; resets to defaults
       client.reset();
     };
   }, []);
 
   const handleLanguageChange = (language: string) => {
     setLanguage(language);
-    console.log(`Language set to: ${language}`);
   };
-
+  
   const startCountdown = () => {
-    setTimeLeft(15 * 60);
+    setTimeLeft(15 * 60); // Set initial time to 15 minutes (900 seconds)
     setIsTicking(true);
+
+    // Start the interval to tick down every second
+    timerIntervalRef.current = window.setInterval(() => {
+      setTimeLeft((prevTime) => {
+        if (prevTime > 0) {
+          return prevTime - 1; // Decrease the time left by 1 second
+        } else {
+          if (timerIntervalRef.current !== null) {
+            clearInterval(timerIntervalRef.current); // Clear the interval when time runs out
+            timerIntervalRef.current = null; // Reset the interval reference
+          }
+          setIsTicking(false); // Stop ticking
+          console.log('Countdown finished!');
+          return 0;
+        }
+      });
+    }, 1000); // Tick every 1000ms (1 second)
   };
 
-  const tick = () => {
-    setTimeLeft((prevTime) => {
-      if (prevTime > 0) {
-        return prevTime - 1;
-      } else {
-        setIsTicking(false); // Stop ticking when time runs out
-        console.log('Countdown finished!');
-        return 0;
-      }
-    });
-  };
-
-  useEffect(() => {
-    if (isTicking && timeLeft > 0) {
-      timer = setInterval(tick, 1000);
-    } else {
-      clearInterval(timer);
+  const stopCountdown = () => {
+    if (timerIntervalRef.current !== null) {
+      clearInterval(timerIntervalRef.current); // Clear the interval to stop the countdown
+      timerIntervalRef.current = null; // Reset the interval reference
+      setIsTicking(false); // Stop ticking
+      console.log('Countdown stopped!');
     }
-    return () => clearInterval(timer); // Cleanup on unmount or when timer stops
-  }, [isTicking, timeLeft]);
+  };
 
   /**
    * Render the application
@@ -425,41 +412,48 @@ export function ConsolePage() {
       </div>
 
       <div className="language-timer-section">
-        <div className="language-timer">
-          <label htmlFor="language-select">Language:</label>
-          <select
-            id="language-select"
-            value={language}
-            onChange={(e) => handleLanguageChange(e.target.value)}
-          >
-            <option value="Select language">Select language</option>
-            <option value="Chinese">Chinese</option>
-            <option value="Malay">Malay</option>
-            <option value="Tamil">Tamil</option>
-            <option value="Cantonese">Cantonese</option>
-            <option value="Hokkien">Hokkien</option>
-            <option value="Teochew">Teochew</option>
-            <option value="Hakka">Hakka</option>
-            <option value="Hainanese">Hainanese</option>
-          </select>
+        <div className="language-start">
+          <div className="language-select">
+            <label htmlFor="language-select">Language:</label>
+            <select
+              id="language-select"
+              value={language}
+              onChange={(e) => handleLanguageChange(e.target.value)}
+            >
+              <option value="Select language">Select language</option>
+              <option value="Chinese">Chinese</option>
+              <option value="Malay">Malay</option>
+              <option value="Tamil">Tamil</option>
+              <option value="Cantonese">Cantonese</option>
+              <option value="Hokkien">Hokkien</option>
+              <option value="Teochew">Teochew</option>
+              <option value="Hakka">Hakka</option>
+              <option value="Hainanese">Hainanese</option>
+            </select>
+          </div>
+          <div className="button-container">
+            <Button
+              label={isConnected ? 'Stop' : 'Start'}
+              iconPosition={isConnected ? 'end' : 'start'}
+              icon={isConnected ? X : Zap}
+              buttonStyle={isConnected ? 'alert' : 'action'}
+              onClick={
+                isConnected ? disconnectConversation : connectConversation
+              }
+            />
+          </div>
+        </div>
+
+        {isTicking && <div className="timer-row">
           <div className="timer">
             <span>
               {Math.floor(timeLeft / 60).toString().padStart(2, '0')}:
               {(timeLeft % 60).toString().padStart(2, '0')}
             </span>
           </div>
-        </div>
-
-        <Button
-          label={isConnected ? 'Stop' : 'Start'}
-          iconPosition={isConnected ? 'end' : 'start'}
-          icon={isConnected ? X : Zap}
-          buttonStyle={isConnected ? 'regular' : 'action'}
-          onClick={
-            isConnected ? disconnectConversation : connectConversation
-          }
-        />
+        </div>}
       </div>
+
 
       <div className="content-main">
         <div className="content-logs">
@@ -528,7 +522,7 @@ export function ConsolePage() {
               })}
             </div>
           </div>
-          
+
         </div>
 
       </div>

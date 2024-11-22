@@ -219,3 +219,48 @@
     }
   }
 }
+
+.language-timer-section {
+  display: flex;
+  flex-direction: column; /* Arrange all elements vertically */
+  gap: 16px; /* Space between the sections */
+  margin-bottom: 8px;
+
+  .language-start {
+    display: flex;
+    flex-direction: row; /* Language select and button in a column */
+    justify-content: space-around;
+
+    .language-select {
+      display: flex;
+      flex-direction: column; /* Label and select stacked vertically */
+      gap: 4px;
+      
+      label {
+        font-size: 14px;
+      }
+
+      select {
+        padding: 8px;
+        font-size: 14px;
+      }
+    }
+
+    .button-container {
+      display: flex;
+      justify-content: flex-end; /* Align the button to the right */
+    }
+  }
+
+  .timer-row {
+    display: flex;
+    justify-content: center; /* Center the timer horizontally */
+    .timer {
+      font-size: 16px;
+      font-weight: bold;
+      color: #333;
+    }
+  }
+}
+
+
