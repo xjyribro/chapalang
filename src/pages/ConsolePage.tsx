@@ -54,12 +54,14 @@ export function ConsolePage() {
   const [items, setItems] = useState<ItemType[]>([]);
   const [realtimeEvents, setRealtimeEvents] = useState<RealtimeEvent[]>([]);
   const [isConnected, setIsConnected] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
   const [memoryKv, setMemoryKv] = useState<{ [key: string]: any }>({});
 
   const [language, setLanguage] = useState('');
   const [timeLeft, setTimeLeft] = useState(0);
   const [isTicking, setIsTicking] = useState(false);
   const timerIntervalRef = useRef<number | null>(null);
+  const [collapsed, setCollapsed] = useState(false);
 
   let timer: NodeJS.Timeout;
 
@@ -114,9 +116,9 @@ export function ConsolePage() {
     // Set instructions
     client.updateSession({ instructions: instructions });
 
-    client.updateSession({
-      turn_detection: { type: 'server_vad' },
-    });
+    // client.updateSession({
+    //   turn_detection: { type: 'server_vad' },
+    // });
 
     // Set state variables
     startTimeRef.current = new Date().toISOString();
@@ -267,6 +269,40 @@ export function ConsolePage() {
   }, []);
 
   /**
+   * In push-to-talk mode, start recording
+   * .appendInputAudio() for each sample
+   */
+  const startRecording = async () => {
+    setIsRecording(true);
+    const client = clientRef.current;
+    const wavRecorder = wavRecorderRef.current;
+    const wavStreamPlayer = wavStreamPlayerRef.current;
+    const trackSampleOffset = await wavStreamPlayer.interrupt();
+    if (trackSampleOffset?.trackId) {
+      const { trackId, offset } = trackSampleOffset;
+      await client.cancelResponse(trackId, offset);
+    }
+    await wavRecorder.record((data) => client.appendInputAudio(data.mono));
+  };
+
+  /**
+   * In push-to-talk mode, stop recording
+   */
+  const stopRecording = async () => {
+    setIsRecording(false);
+    const client = clientRef.current;
+    const wavRecorder = wavRecorderRef.current;
+    await wavRecorder.pause();
+    client.createResponse();
+  };
+
+  const formatKey = (key: string) => {
+    return key
+      .replace(/_/g, ' ') // Replace underscores with spaces
+      .replace(/^\w/, (c) => c.toUpperCase()); // Capitalize the first letter
+  };
+
+  /**
    * Core RealtimeClient and audio capture setup
    * Set all of our instructions, tools, events and more
    */
@@ -302,7 +338,7 @@ export function ConsolePage() {
       async ({ key, value }: { [key: string]: any }) => {
         setMemoryKv((memoryKv) => {
           const newKv = { ...memoryKv };
-          newKv[key] = value;
+          newKv[formatKey(key)] = value;
           return newKv;
         });
         return { ok: true };
@@ -335,6 +371,7 @@ export function ConsolePage() {
       if (delta?.audio) {
         wavStreamPlayer.add16BitPCM(delta.audio, item.id);
       }
+      console.log(delta)
       if (item.status === 'completed' && item.formatted.audio?.length) {
         const wavFile = await WavRecorder.decode(
           item.formatted.audio,
@@ -356,6 +393,8 @@ export function ConsolePage() {
   const handleLanguageChange = (language: string) => {
     setLanguage(language);
   };
+
+  const toggleCollapse = () => setCollapsed(!collapsed);
 
   const startCountdown = () => {
     setTimeLeft(15 * 60); // Set initial time to 15 minutes (900 seconds)
@@ -395,19 +434,16 @@ export function ConsolePage() {
     <div data-component="ConsolePage">
       <div className="content-top">
         <div className="content-title">
-          <img src="/openai-logomark.svg" />
-          <span>realtime console</span>
+          <img src="/chapalang.jpeg" />
         </div>
         <div className="content-api-key">
-          {!LOCAL_RELAY_SERVER_URL && (
-            <Button
-              icon={Edit}
-              iconPosition="end"
-              buttonStyle="flush"
-              label={`api key: ${apiKey.slice(0, 3)}...`}
-              onClick={() => resetAPIKey()}
-            />
-          )}
+          <Button
+            icon={Edit}
+            iconPosition="end"
+            buttonStyle="flush"
+            label={`api key: ${apiKey.slice(0, 3)}...`}
+            onClick={() => resetAPIKey()}
+          />
         </div>
       </div>
 
@@ -444,14 +480,23 @@ export function ConsolePage() {
           </div>
         </div>
 
-        {isTicking && <div className="timer-row">
-          <div className="timer">
-            <span>
-              {Math.floor(timeLeft / 60).toString().padStart(2, '0')}:
-              {(timeLeft % 60).toString().padStart(2, '0')}
-            </span>
-          </div>
-        </div>}
+        {isTicking &&
+          <div>
+            <div className="timer-row">
+              <div className="timer">
+                <span>
+                  {Math.floor(timeLeft / 60).toString().padStart(2, '0')}:
+                  {(timeLeft % 60).toString().padStart(2, '0')}
+                </span>
+              </div>
+            </div>
+            <Button
+              label={isRecording ? 'release to send' : 'push to talk'}
+              buttonStyle={isRecording ? 'alert' : 'regular'}
+              onMouseDown={startRecording}
+              onMouseUp={stopRecording}
+            />
+          </div>}
       </div>
 
 
@@ -481,17 +526,6 @@ export function ConsolePage() {
                       </div>
                     </div>
                     <div className={`speaker-content`}>
-                      {/* tool response */}
-                      {conversationItem.type === 'function_call_output' && (
-                        <div>{conversationItem.formatted.output}</div>
-                      )}
-                      {/* tool call */}
-                      {!!conversationItem.formatted.tool && (
-                        <div>
-                          {conversationItem.formatted.tool.name}(
-                          {conversationItem.formatted.tool.arguments})
-                        </div>
-                      )}
                       {!conversationItem.formatted.tool &&
                         conversationItem.role === 'user' && (
                           <div>
@@ -527,9 +561,12 @@ export function ConsolePage() {
 
       </div><div className="pinned-bottom">
         <div className="content-block kv">
-          <div className="content-block-title">set_memory()</div>
           <div className="content-block-body content-kv">
-            {JSON.stringify(memoryKv, null, 2)}
+            {Object.entries(memoryKv).map(([key, value]) => (
+              <div key={key}>
+                <strong>{formatKey(key)}</strong>: {value}
+              </div>
+            ))}
           </div>
         </div>
       </div>

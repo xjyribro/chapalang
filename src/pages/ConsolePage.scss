@@ -27,8 +27,8 @@
       align-items: center;
       gap: 12px;
       img {
-        width: 24px;
-        height: 24px;
+        width: 150px;
+        height: 40px;
       }
     }
   }
@@ -38,8 +38,7 @@
     flex-shrink: 1 !important;
     margin: 0px 16px;
     display: flex;
-    overflow: hidden;
-    margin-bottom: 24px;
+    overflow: scroll;
     .content-block {
       position: relative;
       display: flex;
@@ -79,9 +78,9 @@
         flex-shrink: 0;
         width: 100%;
         overflow: hidden;
-        height: 200px;
+        height: 800px;
         min-height: 0;
-        max-height: 200px;
+        max-height: 800px;
         border-top: 1px solid #e7e7e7;
       }
     }
