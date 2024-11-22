@@ -1,58 +1,19 @@
-/**
- * Running a local relay server will allow you to hide your API key
- * and run custom logic on the server
- *
- * Set the local relay server address to:
- * REACT_APP_LOCAL_RELAY_SERVER_URL=http://localhost:8081
- *
- * This will also require you to set OPENAI_API_KEY= in a `.env` file
- * You can run it with `npm run relay`, in parallel with `npm start`
- */
 const LOCAL_RELAY_SERVER_URL: string =
   process.env.REACT_APP_LOCAL_RELAY_SERVER_URL || '';
 
 import { useEffect, useRef, useCallback, useState } from 'react';
-
 import { RealtimeClient } from '@openai/realtime-api-beta';
 import { ItemType } from '@openai/realtime-api-beta/dist/lib/client.js';
 import { WavRecorder, WavStreamPlayer } from '../lib/wavtools/index.js';
-import { instructions } from '../utils/conversation_config.js';
+import { getInstructions } from '../utils/conversation_config.js';
 import { WavRenderer } from '../utils/wav_renderer';
 
-import { X, Edit, Zap, ArrowUp, ArrowDown } from 'react-feather';
+import { X, Edit, Zap } from 'react-feather';
 import { Button } from '../components/button/Button';
 import { Toggle } from '../components/toggle/Toggle';
-import { Map } from '../components/Map';
 
 import './ConsolePage.scss';
-import { isJsxOpeningLikeElement } from 'typescript';
-
-/**
- * Type for result from get_weather() function call
- */
-interface Coordinates {
-  lat: number;
-  lng: number;
-  location?: string;
-  temperature?: {
-    value: number;
-    units: string;
-  };
-  wind_speed?: {
-    value: number;
-    units: string;
-  };
-}
-
-/**
- * Type for all event logs
- */
-interface RealtimeEvent {
-  time: string;
-  source: 'client' | 'server';
-  count?: number;
-  event: { [key: string]: any };
-}
+import { RealtimeEvent } from '../constants.js';
 
 export function ConsolePage() {
   /**
@@ -62,8 +23,8 @@ export function ConsolePage() {
   const apiKey = LOCAL_RELAY_SERVER_URL
     ? ''
     : localStorage.getItem('tmp::voice_api_key') ||
-      prompt('OpenAI API Key') ||
-      '';
+    prompt('OpenAI API Key') ||
+    '';
   if (apiKey !== '') {
     localStorage.setItem('tmp::voice_api_key', apiKey);
   }
@@ -85,9 +46,9 @@ export function ConsolePage() {
       LOCAL_RELAY_SERVER_URL
         ? { url: LOCAL_RELAY_SERVER_URL }
         : {
-            apiKey: apiKey,
-            dangerouslyAllowAPIKeyInBrowser: true,
-          }
+          apiKey: apiKey,
+          dangerouslyAllowAPIKeyInBrowser: true,
+        }
     )
   );
 
@@ -119,11 +80,6 @@ export function ConsolePage() {
   const [canPushToTalk, setCanPushToTalk] = useState(true);
   const [isRecording, setIsRecording] = useState(false);
   const [memoryKv, setMemoryKv] = useState<{ [key: string]: any }>({});
-  const [coords, setCoords] = useState<Coordinates | null>({
-    lat: 37.775593,
-    lng: -122.418137,
-  });
-  const [marker, setMarker] = useState<Coordinates | null>(null);
 
   /**
    * Utility for formatting the timing of logs
@@ -202,11 +158,6 @@ export function ConsolePage() {
     setRealtimeEvents([]);
     setItems([]);
     setMemoryKv({});
-    setCoords({
-      lat: 37.775593,
-      lng: -122.418137,
-    });
-    setMarker(null);
 
     const client = clientRef.current;
     client.disconnect();
@@ -376,6 +327,7 @@ export function ConsolePage() {
     const wavStreamPlayer = wavStreamPlayerRef.current;
     const client = clientRef.current;
 
+    const instructions = getInstructions(language)
     // Set instructions
     client.updateSession({ instructions: instructions });
     // Set transcription, otherwise we don't get user transcriptions back
@@ -409,49 +361,6 @@ export function ConsolePage() {
           return newKv;
         });
         return { ok: true };
-      }
-    );
-    client.addTool(
-      {
-        name: 'get_weather',
-        description:
-          'Retrieves the weather for a given lat, lng coordinate pair. Specify a label for the location.',
-        parameters: {
-          type: 'object',
-          properties: {
-            lat: {
-              type: 'number',
-              description: 'Latitude',
-            },
-            lng: {
-              type: 'number',
-              description: 'Longitude',
-            },
-            location: {
-              type: 'string',
-              description: 'Name of the location',
-            },
-          },
-          required: ['lat', 'lng', 'location'],
-        },
-      },
-      async ({ lat, lng, location }: { [key: string]: any }) => {
-        setMarker({ lat, lng, location });
-        setCoords({ lat, lng, location });
-        const result = await fetch(
-          `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,wind_speed_10m`
-        );
-        const json = await result.json();
-        const temperature = {
-          value: json.current.temperature_2m as number,
-          units: json.current_units.temperature_2m as string,
-        };
-        const wind_speed = {
-          value: json.current.wind_speed_10m as number,
-          units: json.current_units.wind_speed_10m as string,
-        };
-        setMarker({ lat, lng, location, temperature, wind_speed });
-        return json;
       }
     );
 
@@ -500,6 +409,42 @@ export function ConsolePage() {
     };
   }, []);
 
+  const [language, setLanguage] = useState('');
+  const [timeLeft, setTimeLeft] = useState(0);
+  const [isTicking, setIsTicking] = useState(false);
+  let timer: NodeJS.Timeout;
+
+  const handleLanguageChange = (language: string) => {
+    setLanguage(language);
+    console.log(`Language set to: ${language}`);
+  };
+
+  const startCountdown = () => {
+    setTimeLeft(15 * 60);
+    setIsTicking(true);
+  };
+
+  const tick = () => {
+    setTimeLeft((prevTime) => {
+      if (prevTime > 0) {
+        return prevTime - 1;
+      } else {
+        setIsTicking(false); // Stop ticking when time runs out
+        console.log('Countdown finished!');
+        return 0;
+      }
+    });
+  };
+
+  useEffect(() => {
+    if (isTicking && timeLeft > 0) {
+      timer = setInterval(tick, 1000);
+    } else {
+      clearInterval(timer);
+    }
+    return () => clearInterval(timer); // Cleanup on unmount or when timer stops
+  }, [isTicking, timeLeft]);
+
   /**
    * Render the application
    */
@@ -522,9 +467,43 @@ export function ConsolePage() {
           )}
         </div>
       </div>
+
+      <div className="language-timer-section">
+        <div className="language-timer">
+          <label htmlFor="language-select">Language:</label>
+          <select
+            id="language-select"
+            value={language}
+            onChange={(e) => handleLanguageChange(e.target.value)}
+          >
+            <option value="Chinese">Chinese</option>
+            <option value="Malay">Malay</option>
+            <option value="Tamil">Tamil</option>
+            <option value="Cantonese">Cantonese</option>
+            <option value="Hokkien">Hokkien</option>
+            <option value="Teochew">Teochew</option>
+            <option value="Hakka">Hakka</option>
+            <option value="Hainanese">Hainanese</option>
+          </select>
+          <div className="timer">
+            <span>
+              {Math.floor(timeLeft / 60).toString().padStart(2, '0')}:
+              {(timeLeft % 60).toString().padStart(2, '0')}
+            </span>
+          </div>
+        </div>
+        <button
+          className="start-button"
+          onClick={startCountdown}
+          disabled={isTicking}
+        >
+          Start
+        </button>
+      </div>
+
       <div className="content-main">
         <div className="content-logs">
-          
+
           <div className="content-block conversation">
             <div className="content-block-title">conversation</div>
             <div className="content-block-body" data-conversation-content>
@@ -566,7 +545,7 @@ export function ConsolePage() {
                               (conversationItem.formatted.audio?.length
                                 ? '(awaiting transcript)'
                                 : conversationItem.formatted.text ||
-                                  '(item sent)')}
+                                '(item sent)')}
                           </div>
                         )}
                       {!conversationItem.formatted.tool &&
@@ -618,7 +597,7 @@ export function ConsolePage() {
             />
           </div>
         </div>
-        
+
       </div>
     </div>
   );

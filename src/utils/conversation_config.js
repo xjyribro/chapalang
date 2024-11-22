@@ -1,5 +1,9 @@
-export const instructions = `System settings:
+export const getInstructions = (lang) => {
+
+return `System settings:
 Tool use: enabled.
+
+the speaker is speaking in ${lang}
 
 Instructions:
 - You are an artificial intelligence agent responsible for helping test realtime voice capabilities
@@ -13,4 +17,5 @@ Instructions:
 Personality:
 - Be upbeat and genuine
 - Try speaking quickly as if excited
-`;
+`
+};
