@@ -73,13 +73,15 @@ export function ConsolePage() {
    */
   const [items, setItems] = useState<ItemType[]>([]);
   const [realtimeEvents, setRealtimeEvents] = useState<RealtimeEvent[]>([]);
-  const [expandedEvents, setExpandedEvents] = useState<{
-    [key: string]: boolean;
-  }>({});
   const [isConnected, setIsConnected] = useState(false);
   const [canPushToTalk, setCanPushToTalk] = useState(true);
   const [isRecording, setIsRecording] = useState(false);
   const [memoryKv, setMemoryKv] = useState<{ [key: string]: any }>({});
+
+  const [language, setLanguage] = useState('');
+  const [timeLeft, setTimeLeft] = useState(0);
+  const [isTicking, setIsTicking] = useState(false);
+  let timer: NodeJS.Timeout;
 
   /**
    * Utility for formatting the timing of logs
@@ -152,7 +154,7 @@ export function ConsolePage() {
     if (client.getTurnDetectionType() === 'server_vad') {
       await wavRecorder.record((data) => client.appendInputAudio(data.mono));
     }
-  }, []);
+  }, [language]);
 
   /**
    * Disconnect and reset conversation state
@@ -410,11 +412,6 @@ export function ConsolePage() {
     };
   }, []);
 
-  const [language, setLanguage] = useState('');
-  const [timeLeft, setTimeLeft] = useState(0);
-  const [isTicking, setIsTicking] = useState(false);
-  let timer: NodeJS.Timeout;
-
   const handleLanguageChange = (language: string) => {
     setLanguage(language);
     console.log(`Language set to: ${language}`);
@@ -494,13 +491,16 @@ export function ConsolePage() {
             </span>
           </div>
         </div>
-        <button
-          className="start-button"
-          onClick={startCountdown}
-          disabled={isTicking}
-        >
-          Start
-        </button>
+        
+        <Button
+              label={isConnected ? 'Stop' : 'Start'}
+              iconPosition={isConnected ? 'end' : 'start'}
+              icon={isConnected ? X : Zap}
+              buttonStyle={isConnected ? 'regular' : 'action'}
+              onClick={
+                isConnected ? disconnectConversation : connectConversation
+              }
+            />
       </div>
 
       <div className="content-main">
@@ -588,15 +588,6 @@ export function ConsolePage() {
               />
             )}
             <div className="spacer" />
-            <Button
-              label={isConnected ? 'disconnect' : 'connect'}
-              iconPosition={isConnected ? 'end' : 'start'}
-              icon={isConnected ? X : Zap}
-              buttonStyle={isConnected ? 'regular' : 'action'}
-              onClick={
-                isConnected ? disconnectConversation : connectConversation
-              }
-            />
           </div>
         </div>
 
