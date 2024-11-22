@@ -1,0 +1,15 @@
+{
+  "files": {
+    "main.css": "/chapalang/static/css/main.8cfb56c6.css",
+    "main.js": "/chapalang/static/js/main.cb9df474.js",
+    "static/js/453.e76c913f.chunk.js": "/chapalang/static/js/453.e76c913f.chunk.js",
+    "index.html": "/chapalang/index.html",
+    "main.8cfb56c6.css.map": "/chapalang/static/css/main.8cfb56c6.css.map",
+    "main.cb9df474.js.map": "/chapalang/static/js/main.cb9df474.js.map",
+    "453.e76c913f.chunk.js.map": "/chapalang/static/js/453.e76c913f.chunk.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.8cfb56c6.css",
+    "static/js/main.cb9df474.js"
+  ]
+}
