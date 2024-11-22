@@ -59,6 +59,8 @@ export function ConsolePage() {
   const [language, setLanguage] = useState('');
   const [timeLeft, setTimeLeft] = useState(0);
   const [isTicking, setIsTicking] = useState(false);
+  const timerIntervalRef = useRef<number | null>(null);
+
   let timer: NodeJS.Timeout;
 
   /**
@@ -99,6 +101,11 @@ export function ConsolePage() {
    * WavRecorder taks speech input, WavStreamPlayer output, client is API client
    */
   const connectConversation = useCallback(async () => {
+
+    if (language === '') {
+      alert('Please select a language')
+      return
+    }
     const client = clientRef.current;
     const wavRecorder = wavRecorderRef.current;
     const wavStreamPlayer = wavStreamPlayerRef.current;
@@ -135,6 +142,8 @@ export function ConsolePage() {
     if (client.getTurnDetectionType() === 'server_vad') {
       await wavRecorder.record((data) => client.appendInputAudio(data.mono));
     }
+
+    startCountdown()
   }, [language]);
 
   /**
@@ -152,6 +161,7 @@ export function ConsolePage() {
     const wavRecorder = wavRecorderRef.current;
     await wavRecorder.end();
 
+    stopCountdown()
     const wavStreamPlayer = wavStreamPlayerRef.current;
     await wavStreamPlayer.interrupt();
   }, []);
@@ -269,35 +279,35 @@ export function ConsolePage() {
     client.updateSession({ input_audio_transcription: { model: 'whisper-1' } });
 
     // Add tools
-    client.addTool(
-      {
-        name: 'set_memory',
-        description: 'Saves important data about the user into memory.',
-        parameters: {
-          type: 'object',
-          properties: {
-            key: {
-              type: 'string',
-              description:
-                'The key of the memory value. Always use lowercase and underscores, no other characters.',
-            },
-            value: {
-              type: 'string',
-              description: 'Value can be anything represented as a string',
-            },
-          },
-          required: ['key', 'value'],
-        },
-      },
-      async ({ key, value }: { [key: string]: any }) => {
-        setMemoryKv((memoryKv) => {
-          const newKv = { ...memoryKv };
-          newKv[key] = value;
-          return newKv;
-        });
-        return { ok: true };
-      }
-    );
+    // client.addTool(
+    //   {
+    //     name: 'set_memory',
+    //     description: 'Saves important data about the user into memory.',
+    //     parameters: {
+    //       type: 'object',
+    //       properties: {
+    //         key: {
+    //           type: 'string',
+    //           description:
+    //             'The key of the memory value. Always use lowercase and underscores, no other characters.',
+    //         },
+    //         value: {
+    //           type: 'string',
+    //           description: 'Value can be anything represented as a string',
+    //         },
+    //       },
+    //       required: ['key', 'value'],
+    //     },
+    //   },
+    //   async ({ key, value }: { [key: string]: any }) => {
+    //     setMemoryKv((memoryKv) => {
+    //       const newKv = { ...memoryKv };
+    //       newKv[key] = value;
+    //       return newKv;
+    //     });
+    //     return { ok: true };
+    //   }
+    // );
 
     // handle realtime events from client + server for event logging
     client.on('realtime.event', (realtimeEvent: RealtimeEvent) => {
@@ -339,41 +349,44 @@ export function ConsolePage() {
     setItems(client.conversation.getItems());
 
     return () => {
-      // cleanup; resets to defaults
       client.reset();
     };
   }, []);
 
   const handleLanguageChange = (language: string) => {
     setLanguage(language);
-    console.log(`Language set to: ${language}`);
   };
-
+  
   const startCountdown = () => {
-    setTimeLeft(15 * 60);
+    setTimeLeft(15 * 60); // Set initial time to 15 minutes (900 seconds)
     setIsTicking(true);
+
+    // Start the interval to tick down every second
+    timerIntervalRef.current = window.setInterval(() => {
+      setTimeLeft((prevTime) => {
+        if (prevTime > 0) {
+          return prevTime - 1; // Decrease the time left by 1 second
+        } else {
+          if (timerIntervalRef.current !== null) {
+            clearInterval(timerIntervalRef.current); // Clear the interval when time runs out
+            timerIntervalRef.current = null; // Reset the interval reference
+          }
+          setIsTicking(false); // Stop ticking
+          console.log('Countdown finished!');
+          return 0;
+        }
+      });
+    }, 1000); // Tick every 1000ms (1 second)
   };
 
-  const tick = () => {
-    setTimeLeft((prevTime) => {
-      if (prevTime > 0) {
-        return prevTime - 1;
-      } else {
-        setIsTicking(false); // Stop ticking when time runs out
-        console.log('Countdown finished!');
-        return 0;
-      }
-    });
-  };
-
-  useEffect(() => {
-    if (isTicking && timeLeft > 0) {
-      timer = setInterval(tick, 1000);
-    } else {
-      clearInterval(timer);
+  const stopCountdown = () => {
+    if (timerIntervalRef.current !== null) {
+      clearInterval(timerIntervalRef.current); // Clear the interval to stop the countdown
+      timerIntervalRef.current = null; // Reset the interval reference
+      setIsTicking(false); // Stop ticking
+      console.log('Countdown stopped!');
     }
-    return () => clearInterval(timer); // Cleanup on unmount or when timer stops
-  }, [isTicking, timeLeft]);
+  };
 
   /**
    * Render the application
@@ -399,41 +412,48 @@ export function ConsolePage() {
       </div>
 
       <div className="language-timer-section">
-        <div className="language-timer">
-          <label htmlFor="language-select">Language:</label>
-          <select
-            id="language-select"
-            value={language}
-            onChange={(e) => handleLanguageChange(e.target.value)}
-          >
-            <option value="Select language">Select language</option>
-            <option value="Chinese">Chinese</option>
-            <option value="Malay">Malay</option>
-            <option value="Tamil">Tamil</option>
-            <option value="Cantonese">Cantonese</option>
-            <option value="Hokkien">Hokkien</option>
-            <option value="Teochew">Teochew</option>
-            <option value="Hakka">Hakka</option>
-            <option value="Hainanese">Hainanese</option>
-          </select>
+        <div className="language-start">
+          <div className="language-select">
+            <label htmlFor="language-select">Language:</label>
+            <select
+              id="language-select"
+              value={language}
+              onChange={(e) => handleLanguageChange(e.target.value)}
+            >
+              <option value="Select language">Select language</option>
+              <option value="Chinese">Chinese</option>
+              <option value="Malay">Malay</option>
+              <option value="Tamil">Tamil</option>
+              <option value="Cantonese">Cantonese</option>
+              <option value="Hokkien">Hokkien</option>
+              <option value="Teochew">Teochew</option>
+              <option value="Hakka">Hakka</option>
+              <option value="Hainanese">Hainanese</option>
+            </select>
+          </div>
+          <div className="button-container">
+            <Button
+              label={isConnected ? 'Stop' : 'Start'}
+              iconPosition={isConnected ? 'end' : 'start'}
+              icon={isConnected ? X : Zap}
+              buttonStyle={isConnected ? 'alert' : 'action'}
+              onClick={
+                isConnected ? disconnectConversation : connectConversation
+              }
+            />
+          </div>
+        </div>
+
+        {isTicking && <div className="timer-row">
           <div className="timer">
             <span>
               {Math.floor(timeLeft / 60).toString().padStart(2, '0')}:
               {(timeLeft % 60).toString().padStart(2, '0')}
             </span>
           </div>
-        </div>
-
-        <Button
-          label={isConnected ? 'Stop' : 'Start'}
-          iconPosition={isConnected ? 'end' : 'start'}
-          icon={isConnected ? X : Zap}
-          buttonStyle={isConnected ? 'alert' : 'action'}
-          onClick={
-            isConnected ? disconnectConversation : connectConversation
-          }
-        />
+        </div>}
       </div>
+
 
       <div className="content-main">
         <div className="content-logs">
