@@ -123,6 +123,10 @@ export function ConsolePage() {
     const wavRecorder = wavRecorderRef.current;
     const wavStreamPlayer = wavStreamPlayerRef.current;
 
+    const instructions = getInstructions(language)
+    // Set instructions
+    client.updateSession({ instructions: instructions });
+
     // Set state variables
     startTimeRef.current = new Date().toISOString();
     setIsConnected(true);
@@ -325,11 +329,8 @@ export function ConsolePage() {
   useEffect(() => {
     // Get refs
     const wavStreamPlayer = wavStreamPlayerRef.current;
-    const client = clientRef.current;
 
-    const instructions = getInstructions(language)
-    // Set instructions
-    client.updateSession({ instructions: instructions });
+    const client = clientRef.current;
     // Set transcription, otherwise we don't get user transcriptions back
     client.updateSession({ input_audio_transcription: { model: 'whisper-1' } });
 
@@ -476,6 +477,7 @@ export function ConsolePage() {
             value={language}
             onChange={(e) => handleLanguageChange(e.target.value)}
           >
+            <option value="Select language">Select language</option>
             <option value="Chinese">Chinese</option>
             <option value="Malay">Malay</option>
             <option value="Tamil">Tamil</option>
