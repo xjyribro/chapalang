@@ -150,7 +150,7 @@ export function ConsolePage() {
     client.sendUserMessageContent([
       {
         type: `input_text`,
-        text: `Before you hear the first audio, please start with translating the following paragraph into ${language}: "This tool serves as an live interpreter between ${language} and English. You can share your concerns in ${language}, and I will translate it into English for you. Please pause every 4-5 sentences so that I can translate it into English for the volunteer who is here with you. Thank you!"`,
+        text: `Before you hear the first audio, please start with translating the following paragraph into Singaporean ${language}: "This tool serves as an live interpreter between ${language} and English. You can share your concerns in ${language}, and I will translate it into English for you. Please pause every 4-5 sentences so that I can translate it into English for the volunteer who is here with you. Thank you!"`,
         // text: `For testing purposes, I want you to list ten car brands. Number each item, e.g. "one (or whatever number you are one): the item name".`
       },
     ]);
